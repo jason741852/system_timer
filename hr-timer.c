@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <sched.h>
+#include <sys/mman.h>
 
 unsigned long long timespecDiff(struct timespec *timeA_p, struct timespec *timeB_p)
 {
@@ -17,6 +18,8 @@ unsigned long long timespecDiff(struct timespec *timeA_p, struct timespec *timeB
 void min_func_call(){}
 
 void process_switch_timer();
+unsigned long long *result2;
+
 void* thread0Call();
 void* thread1Call();
 pthread_mutex_t lock;
@@ -117,55 +120,53 @@ int main()
 // printf("Minmal System Call Measured: %llu\n",result);
 
 //--------------------------------Part 4--------------------------------
-// int i;
-// for(i=0;i<4;i++)
-// {
-//   process_switch_timer();
-// }
+process_switch_timer();
+
 
 
 //--------------------------------Part 5--------------------------------
-cpu_set_t mask;
-CPU_ZERO(&mask);
-CPU_SET(0, &mask);
-sched_setaffinity(getpid(), sizeof(mask), &mask);
-
-pthread_t rt[1];
-int i =0;
-
-
-pthread_mutex_init(&lock, NULL);
-
-
-pthread_create(&rt[0],NULL,&thread0Call,&num);
-pthread_create(&rt[1],NULL,&thread1Call,&num);
-
-
-pthread_join(rt[0],NULL);
-pthread_join(rt[1],NULL);
-
-
-pthread_mutex_destroy(&lock);
+// cpu_set_t mask;
+// CPU_ZERO(&mask);
+// CPU_SET(0, &mask);
+// sched_setaffinity(getpid(), sizeof(mask), &mask);
+//
+// pthread_t rt[1];
+// int i =0;
+//
+//
+// pthread_mutex_init(&lock, NULL);
+//
+//
+// pthread_create(&rt[0],NULL,&thread0Call,&num);
+// pthread_create(&rt[1],NULL,&thread1Call,&num);
+//
+//
+// pthread_join(rt[0],NULL);
+// pthread_join(rt[1],NULL);
+//
+//
+// pthread_mutex_destroy(&lock);
 
 return 0;
 }
 
 
 void* thread0Call(){
+
   int i=0;
   while(i<10){
     pthread_mutex_lock(&lock);
     while(state!=0){
-      clock_gettime(CLOCK_MONOTONIC, &startT0);
       pthread_cond_wait(&cond0, &lock);
-      clock_gettime(CLOCK_MONOTONIC, &stopT0);
     }
+
     pthread_mutex_unlock(&lock);
-    resultT0=timespecDiff(&stopT0,&startT0);
-    printf("resultT0= %llu\n",resultT0);
+    clock_gettime(CLOCK_MONOTONIC, &stopT1);
+    resultT1=timespecDiff(&stopT1,&startT1);
+    printf("resultT1= %llu\n",resultT1);
 
     num = 0;
-    printf("%d\n",num);
+    //    printf("%d\n",num);
     pthread_mutex_lock(&lock);
     state = 1;
     pthread_cond_signal(&cond1);
@@ -181,26 +182,35 @@ void* thread1Call(){
   while(j<10){
     pthread_mutex_lock(&lock);
     while(state!=1){
-      clock_gettime(CLOCK_MONOTONIC, &startT0);
       pthread_cond_wait(&cond1, &lock);
-      clock_gettime(CLOCK_MONOTONIC, &stopT0);
     }
     pthread_mutex_unlock(&lock);
-    resultT0=timespecDiff(&stopT1,&startT1);
-    printf("resultT1= %llu\n",resultT1);
+    //resultT1=timespecDiff(&stopT1,&startT1);
+    //printf("resultT1= %llu\n",resultT1);
 
     num = 1;
-    printf("%d\n",num);
+    //printf("%d\n",num);
     pthread_mutex_lock(&lock);
     state = 0;
     pthread_cond_signal(&cond0);
+    //clock_gettime(CLOCK_MONOTONIC, &startT1);
     pthread_mutex_unlock(&lock);
+    clock_gettime(CLOCK_MONOTONIC, &startT1);
     j++;
   }
   return NULL;
 }
 
 void process_switch_timer(){
+  FILE* fpp = fopen("process_switch_timerP.txt", "w");
+  FILE* fpc = fopen("process_switch_timerC.txt", "w");
+  FILE* fpavg = fopen("process_switch_timerAvg.txt", "w");
+  int i = 0;
+  int j =0;
+  int times = 5;
+  unsigned long long difference;
+  unsigned long long average;
+
   cpu_set_t mask;
   CPU_ZERO(&mask);
   CPU_SET(0, &mask);
@@ -210,13 +220,13 @@ void process_switch_timer(){
   struct timespec start2;
   struct timespec stop2;
   struct timespec start3;
-  struct timespec stop3;
   unsigned long long result1;
-  unsigned long long result2;
-  unsigned long long result3;
+  result2=mmap(NULL, sizeof *result2, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  *result2=0;
 
  int ChildtoParent[2]; // pipe for child contacts parent
  int ParenttoChild[2]; // pipe for parent contacts child
+ int WriteStopTime[2];
  int byte;
 
  char readChar[] = "h";
@@ -226,6 +236,7 @@ void process_switch_timer(){
 
  pipe(ChildtoParent);
  pipe(ParenttoChild);
+ pipe(WriteStopTime);
 
 
  child_pid = fork();
@@ -235,20 +246,16 @@ void process_switch_timer(){
    exit(1);
  }
  if(child_pid==0){
-   //timer start
-   clock_gettime(CLOCK_MONOTONIC, &start2);
    close(ParenttoChild[0]); // Close output of parent to child
    close(ChildtoParent[1]); // Close input side of parent
+   for(j=0;j<100;j++){
+     read(ChildtoParent[0],readChar,sizeof(readChar));
+     write(ParenttoChild[1],readChar,(strlen(readChar)));// go to parent here
+   }
+   clock_gettime(CLOCK_MONOTONIC, &stop1);
 
-   byte = read(ChildtoParent[0],readChar,sizeof(readChar));
-   printf("Parent Sends: %s\n", readChar);
-   //timer stopHookers
-   //write(ParenttoChild[1],readChar,(strlen(readChar)));// go to parent here
-   clock_gettime(CLOCK_MONOTONIC, &stop2);
-   result2=timespecDiff(&stop2,&start2);
-   printf("result2 Measured: %llu\n",result2);
+   write(WriteStopTime[1],&stop1,sizeof(stop1));
    exit(0);
-   //timer stop
  }
  else{
    close(ParenttoChild[1]); // Close output of parent to child
@@ -257,80 +264,17 @@ void process_switch_timer(){
 
    //timer start
    clock_gettime(CLOCK_MONOTONIC, &start1);
-   write(ChildtoParent[1],readChar,(strlen(readChar)));// go to child here
-   printf("Child Sends: %s\n", readChar);
-   byte = read(ParenttoChild[0],readChar,sizeof(readChar));
+   for(i=0;i<100;i++){
+     write(ChildtoParent[1],readChar,(strlen(readChar)));// go to child here
+     read(ParenttoChild[0],readChar,sizeof(readChar));
+   }
+
+   read(WriteStopTime[0],&stop1,sizeof(stop1));
    wait(NULL);
-   clock_gettime(CLOCK_MONOTONIC, &stop1);
-   result1=timespecDiff(&stop1,&start1);
-   printf("result1 Measured: %llu\n",result1);
+
+   result1 = timespecDiff(&stop1,&start1);
+   result1=result1/200;
+   printf("%llu\n",result1);
  }
  return;
 }
-
-// #include<stdio.h>
-// #include<string.h>
-// #include<pthread.h>
-// #include<stdlib.h>
-// #include<unistd.h>
-//
-// pthread_t tid[2];
-// int counter;
-// pthread_mutex_t lock;
-//
-// void* doSomeThing(void *arg)
-// {
-//     pthread_mutex_lock(&lock);
-//
-//     unsigned long i = 0;
-//     counter = 1;
-//     printf("\n Job %d started\n", counter);
-//
-//     for(i=0; i<(0xFFFFFFFF);i++);
-//
-//     printf("\n Job %d finished\n", counter);
-//
-//     pthread_mutex_unlock(&lock);
-//
-//     return NULL;
-// }
-//
-// void* doSomeThing2(void *arg)
-// {
-//     pthread_mutex_lock(&lock);
-//
-//     unsigned long i = 0;
-//     counter =0;
-//     printf("\n Job %d started\n", counter);
-//
-//     for(i=0; i<(0xFFFFFFFF);i++);
-//
-//     printf("\n Job %d finished\n", counter);
-//
-//     pthread_mutex_unlock(&lock);
-//
-//     return NULL;
-// }
-//
-// int main(void)
-// {
-//     int i = 0;
-//     int err;
-//
-//     if (pthread_mutex_init(&lock, NULL) != 0)
-//     {
-//         printf("\n mutex init failed\n");
-//         return 1;
-//     }
-//
-//     pthread_create(&(tid[0]), NULL, &doSomeThing, NULL);
-//     pthread_create(&(tid[1]), NULL, &doSomeThing2, NULL);
-//
-//     pthread_join(tid[0], NULL);
-//     printf("1 %d\n",counter);
-//     pthread_join(tid[1], NULL);
-//     printf("2 %d\n",counter);
-//     pthread_mutex_destroy(&lock);
-//
-//     return 0;
-// }
