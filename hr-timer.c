@@ -130,37 +130,37 @@ for(n=0;n<500;n++){
 printf("Minmal System Call Measured: %llu\n",result);
 
 //--------------------------------Part 4--------------------------------
-// int j=0;
-// FILE* fp = fopen("process_switch_timerP.txt", "w");
-// unsigned long long resultP;
-// for(j;j<500;j++){
-//   resultP = process_switch_timer();
-//   fprintf(fp,"%llu\n",resultP);
-// }
+int j=0;
+FILE* fp = fopen("process_switch_timerP.txt", "w");
+unsigned long long resultP;
+for(j;j<500;j++){
+  resultP = process_switch_timer();
+  fprintf(fp,"%llu\n",resultP);
+}
 
 
 //--------------------------------Part 5--------------------------------
-// cpu_set_t mask;
-// CPU_ZERO(&mask);
-// CPU_SET(0, &mask);
-// sched_setaffinity(getpid(), sizeof(mask), &mask);
-//
-// pthread_t rt[1];
-// int i =0;
-//
-//
-// pthread_mutex_init(&lock, NULL);
-//
-//
-// pthread_create(&rt[0],NULL,&thread0Call,&num);
-// pthread_create(&rt[1],NULL,&thread1Call,&num);
-//
-//
-// pthread_join(rt[0],NULL);
-// pthread_join(rt[1],NULL);
-//
-//
-// pthread_mutex_destroy(&lock);
+cpu_set_t mask;
+CPU_ZERO(&mask);
+CPU_SET(0, &mask);
+sched_setaffinity(getpid(), sizeof(mask), &mask);
+
+pthread_t rt[1];
+int i =0;
+
+
+pthread_mutex_init(&lock, NULL);
+
+
+pthread_create(&rt[0],NULL,&thread0Call,&num);
+pthread_create(&rt[1],NULL,&thread1Call,&num);
+
+
+pthread_join(rt[0],NULL);
+pthread_join(rt[1],NULL);
+
+
+pthread_mutex_destroy(&lock);
 
 return 0;
 }
