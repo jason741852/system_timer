@@ -1,5 +1,5 @@
-CC=gcc
-CFLAGS=
+CC=gcc $(CFLAGS)
+CFLAGS= -pthread
 
 all: hr-timer
 program: hr-timer.o
